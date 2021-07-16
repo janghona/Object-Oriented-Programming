@@ -1,7 +1,7 @@
 ﻿#ifndef _CRT_SECURE_NO_WARNINGS
 #define _CRT_SECURE_NO_WARNINGS
 #endif
-
+// 커밋 테스트 !!!!!!!!!!!!!!
 #include <iostream>
 #include <conio.h> // console io
 #include <cstring> // string.h
