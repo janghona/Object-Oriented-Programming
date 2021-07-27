@@ -51,34 +51,50 @@ struct Screen {
 		strncpy(&(canvas[pos]), face, strlen(face)); // for bullet draw
 	}
 
-	bool isInRange(Bullet* bullet) { return true; }
+	bool isInRange(Bullet* bullet);
 };
-
-struct Player{
+struct GameObject {
 	char face[20];
 	int pos;
+	int direction;
+
+	GameObject(const char* face, int pos,int direction)
+		: pos(pos), direction(direction)
+	{
+		strcpy(this->face, face);
+	}
+
+	~GameObject() {}
+
+	int getPos() { return pos; }
+	void setPos(int pos) { this->pos = pos; }
+
+	const char* getFace() { return face; }
+	void setFace(const char* face) { strcpy(this->face, face); }
+
+	int getDirection() { return direction; }
+	void setDirection(int direction) { this->direction = direction; }
+
+	void draw(Screen* screen) {
+		screen->draw(pos, face);
+	}
+};
+
+struct Player : public GameObject{
 	int nRemaining;
 
-	Player(const char* face,int pos) {
-		strcpy(this->face, face);
-		this->pos = pos;
-		this->nRemaining = 0;
+	Player(const char* face, int pos)
+		: GameObject(face, pos, directionToRight), nRemaining(0)
+	{ 
 	}
 	
 	void move(int direction){
 		(direction == directionToLeft) ? --pos : ++pos;
 	}
 
-	int getPos() {return pos;}
-	const char* getFace() {return face;}
-
 	void onEnemyHit(){
 		strcpy(face, "(^_^)");
 		nRemaining = 20;
-	}
-
-	void draw(Screen* screen){
-		screen->draw(pos, face);
 	}
 
 	void update(const char* face){
@@ -87,65 +103,39 @@ struct Player{
 		if (nRemaining == 0) strcpy(this->face, face);
 	}
 
-	void fire(Bullets* bullets, Enemy* enemy) {
-
-		//Bullet* bullet = bullets->find_unused_bullet();
-		//if (bullet == nullptr) return;
-		//// 사용하지 않은 총알이 있습니다.
-		//bullet->isReady = false; // 사용중 표시
-
-		//if (pos < enemy->pos) bullet->direction = directionToRight;
-		//else bullet->direction = directionToLeft;
-
-		//if (bullet->direction == directionToRight) bullet->pos = pos + strlen(face) - 1;
-		//else bullet->pos = pos;
-	}
+	void fire(Bullets* bullets, Enemy* enemy);
 };
 
-struct Enemy {
-	char face[20];
-	int pos;
+struct Enemy : public GameObject {
 	int nRemaining;
 
-	Enemy(const char* face, int pos) {
-		strcpy(this->face, face);
-		this->pos = pos;
-		this->nRemaining = 0;
+	Enemy(const char* face, int pos)
+		: GameObject(face,pos,directionToLeft), nRemaining(0)
+	{
 	}
 
-	int getPos() {return pos;}
-
 	void onHit() {
-		strcpy(face, "(T_T)");
+		setFace("(T_T)");
 		nRemaining = 10;
 	}
 
-	void draw(Screen* screen){
-		screen->draw(pos, face);
-	}
 	void update(const char* face)
 	{
 		if (nRemaining == 0) return;
 		--nRemaining;
-		if (nRemaining == 0) strcpy(this->face, face);
+		if (nRemaining == 0) setFace(face);
 	}
 
-	bool isHit(Bullet* bullet) { return true; }
+	bool isHit(Bullet* bullet);
 };
 
-struct Bullet{
+struct Bullet : public GameObject{
 	bool isReady;
-	int pos;
-	int direction;
-
-	Bullet() {
-		isReady = true;
-		pos = 0;
-		direction = directionToRight;
+	
+	Bullet()
+	:GameObject("-",0,directionToLeft), isReady(true)
+	{
 	}
-
-	int  getPos(){return pos;}
-	int  getDirection(){return direction;}
 
 	void reuse(){
 		isReady = true;
@@ -153,11 +143,6 @@ struct Bullet{
 
 	void move(){
 		(direction == directionToLeft) ? --pos : ++pos;
-	}
-
-	void draw(Screen* screen){
-		if (isReady == true) return;
-		screen->draw(pos, '-');
 	}
 
 	void update(Player* player, Enemy* enemy, Screen* screen){
@@ -171,6 +156,20 @@ struct Bullet{
 			reuse();
 		}
 		if (!screen->isInRange(this)) reuse();
+	}
+
+	void setFire(Player* player, Enemy* enemy) {
+		isReady = false; // 사용중ㅇ
+		int enemy_pos = enemy->getPos();
+		int player_pos = player->getPos();
+		const char* player_face = player->getFace();
+
+		setDirection(directionToLeft);
+		if (player_pos < enemy_pos) setDirection(directionToRight);
+
+		setPos(player_pos);
+		if (getDirection() == directionToRight)
+			setPos(getPos() + (strlen(player_face) - 1));
 	}
 };
 
@@ -191,23 +190,20 @@ struct Bullets{
 	}
 
 	void draw(Screen* screen){
-		for (int i = 0; i < nBullets; i++)
-		{
+		for (int i = 0; i < nBullets; i++){
 			Bullet* bullet = &bullets[i];
 			bullet->draw(screen);
 		}
 	}
 
 	void update(Player* player, Enemy* enemy, Screen* screen){
-		for (int i = 0; i < nBullets; i++)
-		{
+		for (int i = 0; i < nBullets; i++){
 			Bullet* bullet = &bullets[i];
 			bullet->update(player, enemy, screen);
 		}
 	}
 
 	Bullet* find_unused_bullet() {
-		// 총알들중 현재 사용중이지 않은 것을 찾아냄.
 		for (int i = 0; i < nBullets; i++) {
 			Bullet* bullet = &bullets[i];
 			if (bullet->isReady == true) return bullet;
@@ -215,6 +211,26 @@ struct Bullets{
 		return nullptr;
 	}
 };
+
+// 전방위 선언 중 사용할 함수
+bool Screen::isInRange(Bullet* bullet)
+{
+	int bullet_pos = bullet->getPos();
+	return bullet_pos >= 0 && bullet_pos < size;
+}
+void Player::fire(Bullets* bullets, Enemy* enemy)
+{
+	Bullet* bullet = bullets->find_unused_bullet();
+	if (bullet == nullptr) return;
+	bullet->setFire(this, enemy);
+}
+bool Enemy::isHit(Bullet* bullet)
+{
+	int bullet_direction = bullet->getDirection();
+	int bullet_pos = bullet->getPos();
+	return ((bullet_direction == directionToLeft && getPos() + strlen(getFace()) - 1 == bullet_pos)
+		|| (bullet_direction == directionToRight && getPos() == bullet_pos));
+}
 
 int main()
 {
