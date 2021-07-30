@@ -57,11 +57,14 @@ struct GameObject {
 	int pos;
 	int direction;
 	Screen* screen;
+	char type[10];
+	GameObject** gameObjects;
 
-	GameObject(Screen* screen,const char* face, int pos,int direction)
-		: pos(pos), direction(direction), screen(screen)
+	GameObject(GameObject** gameObjects,Screen* screen,const char* face, int pos,int direction,const char* type)
+		: pos(pos), direction(direction), screen(screen), gameObjects(gameObjects)
 	{
 		setFace(face);
+		strcpy(this->type, type);
 	}
 
 	~GameObject() {}
@@ -75,9 +78,14 @@ struct GameObject {
 	int getDirection() { return direction; }
 	void setDirection(int direction) { this->direction = direction; }
 
+	Screen* getScreen() { return screen; }
+	GameObject** getGameObjects() { return gameObjects; }
+
 	void draw() {
 		screen->draw(pos, face);
 	}
+
+	void update() {}
 
 	void move(int direction){
 		direction == directionToRight ? pos++ : pos--;
@@ -85,22 +93,27 @@ struct GameObject {
 	void move(){
 		direction == directionToLeft ? --pos : ++pos;
 	}
+
+	bool equal(const char* type)
+	{
+		return strcmp(this->type, type) == 0;
+	}
+
 };
 
 struct Player : public GameObject{
 	int nRemaining;
-	int nBullets;
-	Bullet** bullets;
 	char		originalFace[20];
 
-	Player(Screen* screen, const char* face, int pos);
+	Player(GameObject** gameObjects,Screen* screen, const char* face, int pos);
 	~Player();
 
 	void draw();
-	void update(Enemy* enemy);
+	void update();
 
-	void fire(Enemy* enemy);
+	void fire();
 	Bullet* find_unused_bullet();
+	Enemy* find_enemy();
 
 	void onEnemyHit() {
 		setFace("(^_^)");
@@ -112,8 +125,8 @@ struct Enemy : public GameObject {
 	int nRemaining;
 	char	originalFace[20];
 
-	Enemy(Screen* screen,const char* face, int pos)
-		: GameObject(screen,face,pos,directionToLeft), nRemaining(0)
+	Enemy(GameObject** gameObjects,Screen* screen,const char* face, int pos)
+		: GameObject(gameObjects,screen,face,pos,directionToLeft,"enemy"), nRemaining(0)
 	{
 		strcpy(originalFace, face);
 	}
@@ -136,8 +149,8 @@ struct Enemy : public GameObject {
 struct Bullet : public GameObject{
 	bool isReady;
 	
-	Bullet(Screen* screen)
-	:GameObject(screen,"-",0,directionToLeft), isReady(true)
+	Bullet(GameObject** gameObjects,Screen* screen)
+	:GameObject(gameObjects,screen,"-",0,directionToLeft,"bullet"), isReady(true)
 	{
 	}
 
@@ -147,17 +160,33 @@ struct Bullet : public GameObject{
 		isReady = true;
 	}
 
-	void update(Player* player, Enemy* enemy){
+	void update(){
 		if (isReady == true) return;
 
 		move();
 
-		if (enemy->isHit(this))
-		{ // 적이 총알을 맞았을 때
-			enemy->onHit();
-			player->onEnemyHit();
-			makeReady();
+		GameObject** gameObjects = getGameObjects();
+		Player* player = nullptr;
+		for (int i = 0;i < 82;i++) {
+			GameObject* obj = gameObjects[i];
+			if (obj->equal("player")) {
+				player = (Player*)obj;
+			}
 		}
+
+		for (int i = 0; player != nullptr && i < 82;i++) {
+			GameObject* obj = gameObjects[i];
+			if (obj->equal("enemy")) {
+				Enemy* enemy = (Enemy*)obj;
+				if (enemy->isHit(this))
+				{ // 적이 총알을 맞았을 때
+					enemy->onHit();
+					player->onEnemyHit();
+					makeReady();
+				}
+			}
+		}
+		Screen* screen = getScreen();
 		if (!screen->isInRange(this)) makeReady();
 	}
 
@@ -184,61 +213,55 @@ struct Bullet : public GameObject{
 };
 
 // 전방위 선언 중 사용할 함수
-bool Screen::isInRange(Bullet* bullet)
-{
+bool Screen::isInRange(Bullet* bullet){
 	int bullet_pos = bullet->getPos();
 	return bullet_pos >= 0 && bullet_pos < size;
 }
 
-Player::Player(Screen* screen, const char* face, int pos)
-	: GameObject(screen, face, pos, directionToRight), nRemaining(0),
-	nBullets(80), bullets( new Bullet*[nBullets])
+Player::Player(GameObject** gameObjects,Screen* screen, const char* face, int pos)
+	: GameObject(gameObjects,screen, face, pos, directionToRight,"player"), nRemaining(0)
 {
-	for (int i = 0; i < nBullets; i++){
-		bullets[i] = new Bullet(screen);
-	}
 	strcpy(originalFace, face);
 }
 
 Player::~Player()
 {
-	for (int i = 0; i < nBullets; i++)
-		delete bullets[i];
-	delete[] bullets;
-	bullets = nullptr;
-	nBullets = 0;
 }
 
-void Player::fire(Enemy* enemy)
-{
+void Player::fire(){
 	Bullet* bullet = find_unused_bullet();
 	if (bullet == nullptr) return;
+	Enemy* enemy = find_enemy();
+	if (enemy == nullptr) return;
 	bullet->setFire(this, enemy);
 }
 
-Bullet* Player::find_unused_bullet()
-{
-	for (int i = 0; i < nBullets; i++){
-		Bullet* bullet = bullets[i];
+Bullet* Player::find_unused_bullet(){
+	GameObject** gameObjects = getGameObjects();
+	for (int i = 0; i < 82; i++){
+		GameObject* obj = gameObjects[i];
+		if (obj->equal("bullet") == false) continue;
+		Bullet* bullet = (Bullet*)obj;
 		if (bullet->isAvailable() == true) return bullet;
 	}
 	return nullptr;
 }
 
-void Player::draw() {
-	GameObject::draw();
-	for (int i = 0; i < nBullets;i++) {
-		Bullet* bullet = bullets[i];
-		bullet->draw();
+Enemy* Player::find_enemy() {
+	GameObject** gameObjects = getGameObjects();
+	for (int i = 0; i < 82;i++) {
+		GameObject* obj = gameObjects[i];
+		if (obj->equal("enemy") == false) continue;
+		Enemy* enemy = (Enemy*)obj;
+		return enemy;
 	}
 }
 
-void Player::update(Enemy* enemy) {
-	for (int i = 0; i < nBullets; i++){
-		Bullet* bullet = bullets[i];
-		bullet->update(this,enemy);
-	}
+void Player::draw() {
+	GameObject::draw();
+}
 
+void Player::update() {
 	if (nRemaining == 0) return;
 	--nRemaining;
 	if (nRemaining == 0) setFace(originalFace);
@@ -254,8 +277,13 @@ bool Enemy::isHit(Bullet* bullet)
 int main()
 {
 	Screen screen(80);
-	Player* player = new Player(&screen,"(-_-)", 50);
-	Enemy* enemy = new Enemy(&screen,"(`_#)", 10);
+	GameObject* gameObjects[80 + 1 + 1];
+
+	gameObjects[0] = new Player(gameObjects, &screen, "(-_-)", 50);
+	gameObjects[1] = new Enemy(gameObjects, &screen, "(`_#)", 10);
+
+	for (int i = 0; i < 80; i++)
+		gameObjects[i + 2] = new Bullet(gameObjects, &screen);
 
 	int major;
 	int minor;
@@ -264,31 +292,56 @@ int main()
 	while (true) {
 		screen.clear();
 
-		player->update(enemy);
-		enemy->update();
+		for (int i = 0; i < 82; i++) {
+			GameObject* obj = gameObjects[i];
+			if (obj->equal("player")) {
+				Player* player = (Player*)obj;
+				player->update();
+			}
+			else if (obj->equal("enemy")) {
+				Enemy* enemy = (Enemy*)obj;
+				enemy->update();
+			}
+			else if (obj->equal("bullet")) {
+				Bullet* bullet = (Bullet*)obj;
+				bullet->update();
+			}
+		}
 
-		player->draw();
-		enemy->draw();
+		for (int i = 0; i < 82; i++) {
+			GameObject* obj = gameObjects[i];
+			if (obj->equal("player")) {
+				Player* player = (Player*)obj;
+				player->draw();
+			}
+			else if (obj->equal("enemy")) {
+				Enemy* enemy = (Enemy*)obj;
+				enemy->draw();
+			}
+			else if (obj->equal("bullet")) {
+				Bullet* bullet = (Bullet*)obj;
+				bullet->draw();
+			}
+		}
 	
 		screen.render();
 		Sleep(100);
 
 		// handle inputs
 		if (!_kbhit()) continue;
-
 			major = _getch();
 			switch (major) {
 			case ' ':
-				player->fire(enemy);
+				((Player*)gameObjects[0])->fire();
 				break;
 			case 224: // arrow key, function key pressed
 				minor = _getch();
 				switch (minor) {
 				case 75: // left
-					player->move(directionToLeft);
+					gameObjects[0]->move(directionToLeft);
 					break;
 				case 77: // right
-					player->move(directionToRight);
+					gameObjects[0]->move(directionToRight);
 					break;
 				case 72: // up
 					break;
@@ -298,10 +351,10 @@ int main()
 				break;
 		    }
 	}
-	delete enemy;
-	delete player;
+
+	for (int i = 0; i < 82; i++)
+		delete gameObjects[i];
 
 	printf("\nGame Over\n");
-
 	return 0;
 }
