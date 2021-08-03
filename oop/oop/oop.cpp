@@ -11,15 +11,16 @@
 const int directionToLeft = 0;
 const int directionToRight = 1;
 
-struct Screen;
-struct Player;
-struct Enemy;
-struct Bullet;
+class Screen;
+class Player;
+class Enemy;
+class Bullet;
 
-struct Screen {
+class Screen {
+private:
 	int size;
 	char* canvas;
-
+public:
 	Screen(unsigned int screenSize) {
 		if (size == 0) size = 80;
 		size = screenSize;
@@ -52,13 +53,15 @@ struct Screen {
 
 	bool isInRange(Bullet* bullet);
 };
-struct GameObject {
+class GameObject {
+private:
 	char face[20];
 	int pos;
 	int direction;
 	Screen* screen;
 	GameObject** gameObjects;
 
+public:
 	GameObject(GameObject** gameObjects,Screen* screen,const char* face, int pos,int direction)
 		: pos(pos), direction(direction), screen(screen), gameObjects(gameObjects)
 	{
@@ -93,10 +96,12 @@ struct GameObject {
 	}
 };
 
-struct Player : public GameObject{
+class Player : public GameObject{
+private:
 	int nRemaining;
 	char		originalFace[20];
 
+public:
 	Player(GameObject** gameObjects,Screen* screen, const char* face, int pos);
 	~Player() override {	}
 
@@ -113,10 +118,12 @@ struct Player : public GameObject{
 	}
 };
 
-struct Enemy : public GameObject {
+class Enemy : public GameObject {
+private:
 	int nRemaining;
 	char	originalFace[20];
 
+public:
 	Enemy(GameObject** gameObjects,Screen* screen,const char* face, int pos)
 		: GameObject(gameObjects,screen,face,pos,directionToLeft), nRemaining(0)
 	{
@@ -138,9 +145,11 @@ struct Enemy : public GameObject {
 	bool isHit(Bullet* bullet);
 };
 
-struct Bullet : public GameObject{
+class Bullet : public GameObject{
+private:
 	bool isReady;
 	
+public:
 	Bullet(GameObject** gameObjects,Screen* screen)
 	:GameObject(gameObjects,screen,"-",0,directionToLeft), isReady(true)
 	{
@@ -279,44 +288,7 @@ int main()
 	while (true) {
 		screen.clear();
 
-		//for (int i = 0; i < 82; i++) {
-		//	GameObject* obj = gameObjects[i];
-		//	Player* player = dynamic_cast<Player*>(obj);
-		//	if (player != nullptr) {
-		//		player->update();
-		//		continue;
-		//	}
-		//	Enemy* enemy = dynamic_cast<Enemy*>(obj);
-		//	if (enemy != nullptr) {
-		//		enemy->update();
-		//		continue;
-		//	}
-		//	Bullet* bullet = dynamic_cast<Bullet*>(obj);
-		//	if (bullet != nullptr) {
-		//		bullet->update();
-		//	}
-		//}
-
 		for (int i = 0; i < 82; i++) gameObjects[i]->update();
-
-	/*	for (int i = 0; i < 82; i++) {
-			GameObject* obj = gameObjects[i];
-			Player* player = dynamic_cast<Player*>(obj);
-			if (player != nullptr) {
-				player->draw();
-				continue;
-			}
-			Enemy* enemy = dynamic_cast<Enemy*>(obj);
-			if (enemy != nullptr) {
-				enemy->draw();
-				continue;
-			}
-			Bullet* bullet = dynamic_cast<Bullet*>(obj);
-			if (bullet != nullptr) {
-				bullet->draw();
-			}
-		}*/
-
 		for (int i = 0; i < 82; i++) gameObjects[i]->draw();
 	
 		screen.render();
@@ -347,8 +319,7 @@ int main()
 		    }
 	}
 
-	for (int i = 0; i < 82; i++)
-		delete gameObjects[i];
+	for (int i = 0; i < 82; i++) delete gameObjects[i];
 
 	printf("\nGame Over\n");
 	return 0;
