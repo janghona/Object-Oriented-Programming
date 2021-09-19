@@ -8,6 +8,7 @@
 #include <cstdlib> // stdlib.h
 #include <string> // c++ string class
 #include <Windows.h>
+#include<deque>
 #include"Utils.h"
 using namespace std;
 
@@ -54,6 +55,9 @@ public:
 	void draw(int x, int y, char shape) {
 		buffer[y * getScreenWidth() + x] = shape;
 	}
+	void draw(int x, int y, const char* shape) {
+		strncpy(&buffer[y*getScreenWidth() + x], shape, strlen(shape));
+	}
 };
 Screen* Screen::instance = nullptr;
 
@@ -63,39 +67,15 @@ private:
 	DWORD fdwSaveOldMode;
 	DWORD fdwMode;
 	INPUT_RECORD irInBuf[128];
+	deque<INPUT_RECORD> events;
 
-	InputManager() :hStdin(GetStdHandle(STD_INPUT_HANDLE))
-	{
-		if (hStdin == INVALID_HANDLE_VALUE) ErrorExit("GetStdHandle");
-		if (!GetConsoleMode(hStdin, &fdwSaveOldMode)) ErrorExit("GetConsoleMode");
-
-		// Enable the window and mouse input events. 
-		fdwMode = ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT;
-		if (!SetConsoleMode(hStdin, fdwMode)) ErrorExit("SetConsoleMode");
-	}
-	static InputManager* instance;
-public:
-	static InputManager* getInstance() {
-		if (instance == nullptr) {
-			instance = new InputManager();
-		}
-		return instance;
-	}
 	VOID ErrorExit(const char* lpszMessage) {
-		Borland::gotoxy(0, 21);
-		printf("%80d\r", ' ');
-		printf("%s\n", lpszMessage);
-
 		// Restore input mode on exit.
 		SetConsoleMode(hStdin, fdwSaveOldMode);
 		ExitProcess(0);
 	}
 
 	VOID KeyEventProc(KEY_EVENT_RECORD ker) {
-		Borland::gotoxy(0, 22);
-		printf("%80d\r", ' ');
-		printf("Key event: %c  %d        ", ker.uChar, ker.wRepeatCount);
-
 		if (ker.bKeyDown)
 			printf("key pressed\n");
 		else printf("key released\n");
@@ -139,59 +119,129 @@ public:
 		}
 	}
 
+	InputManager() :hStdin(GetStdHandle(STD_INPUT_HANDLE)), irInBuf{ {0} }
+	{
+		if (hStdin == INVALID_HANDLE_VALUE) ErrorExit("GetStdHandle");
+		if (!GetConsoleMode(hStdin, &fdwSaveOldMode)) ErrorExit("GetConsoleMode");
+
+		// Enable the window and mouse input events. 
+		fdwMode = ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT;
+		if (!SetConsoleMode(hStdin, fdwMode)) ErrorExit("SetConsoleMode");
+		events.clear();
+	}
+	static InputManager* instance;
+public:
+	static InputManager* getInstance() {
+		if (instance == nullptr) {
+			instance = new InputManager();
+		}
+		return instance;
+	}
+
+	bool GetKeyDown(WORD ch) {
+		if (events.empty() == true) return false;
+		INPUT_RECORD& in = events.front();
+		if (in.EventType != KEY_EVENT) return false;
+		if (in.Event.KeyEvent.bKeyDown = TRUE) {
+			return in.Event.KeyEvent.wVirtualKeyCode == ch;
+		}
+		return false;
+	}
+
 	void readInputs() {
 		DWORD cNumRead;
-		if (!ReadConsoleInput(
+		DWORD nEvents;
+
+		if (!GetNumberOfConsoleInputEvents(hStdin, &nEvents)) return;
+		if (nEvents == 0) return;
+		nEvents = min(nEvents, 128);
+
+		ReadConsoleInput(
 			hStdin,      // input buffer handle 
 			irInBuf,     // buffer to read into 
-			128,         // size of read buffer 
-			&cNumRead)) // number of records read 
-			ErrorExit("ReadConsoleInput");
-
-		// Dispatch the events to the appropriate handler. 
-		for (int i = 0; i < cNumRead; i++)
-		{
-			switch (irInBuf[i].EventType)
-			{
-			case KEY_EVENT: // keyboard input 
-				KeyEventProc(irInBuf[i].Event.KeyEvent);
-				break;
-
-			case MOUSE_EVENT: // mouse input 
-				MouseEventProc(irInBuf[i].Event.MouseEvent);
-				break;
-			case FOCUS_EVENT:  // disregard focus events 
-
-			case MENU_EVENT:   // disregard menu events 
-				break;
-
-			default:
-				ErrorExit("Unknown event type");
-				break;
-			}
+			nEvents,         // size of read buffer 
+			&cNumRead); // number of records read 
+			
+		for (int i = 0; i < cNumRead; i++){
+			events.push_back(irInBuf[i]);
 		}
-		//debugging
-		Borland::gotoxy(0, 21);
-		printf("cNumRead = %d", cNumRead);
+	}
+
+	void consumeEvent() {
+		if (events.empty() == true) return;
+		events.pop_front();
 	}
 };
 InputManager* InputManager::instance = nullptr;
 
+class GameObject {
+private:
+	string shape;
+	Position pos;
+protected:
+	Screen& screen;
+	InputManager& inputManager;
+public:
+	GameObject(int x,int y,const string& shape)
+		:shape(shape),pos(x,y),screen(*Screen::getInstance()),inputManager(*InputManager::getInstance())
+	{
+
+	}
+	virtual ~GameObject()
+	{
+	}
+
+	void setPos(int x, int y) { pos.x = x; pos.y = y; }
+	void setPos(const Position& pos) { this->pos.x = pos.x; this->pos.y = pos.y; }
+	Position getPos() const { return pos; }
+
+	virtual void update() {}
+	virtual void draw() { screen.draw(pos.x, pos.y, shape.c_str()); }
+};
+
+class Block : public GameObject {
+
+public:
+	Block(int x = 5, int y = 5, const string& shape = "(^_^)")
+		: GameObject(x, y, shape) {}
+
+	void update() override{
+		Position pos = getPos();
+		if (inputManager.GetKeyDown(VK_LEFT) == true) {
+			setPos(pos.x - 1, pos.y);
+		}
+		if (inputManager.GetKeyDown(VK_RIGHT) == true) {
+			setPos(pos.x + 1, pos.y);
+		}
+		if (inputManager.GetKeyDown(VK_UP) == true) {
+			setPos(pos.x, pos.y - 1);
+		}
+		if (inputManager.GetKeyDown(VK_DOWN) == true) {
+			setPos(pos.x, pos.y + 1);
+		}
+	}
+};
+
 int main()
 {
-	Screen* screen = Screen::getInstance();
-	InputManager* inputmanager = InputManager::getInstance();
+	Screen& screen = *Screen::getInstance();
+	InputManager& inputmanager = *InputManager::getInstance();
+	Block block;
 
 	bool requestExit = false;
 	int x = 0, y = 0;
 	
 	while (requestExit == false) {
-		screen->clear();
+		screen.clear();
 	
-		inputmanager->readInputs();
+		inputmanager.readInputs();
 
-		screen->draw(x, y, '0' + x);
-		screen->render();
+		block.update();
+		block.draw();
+
+		screen.render();
+
+		inputmanager.consumeEvent();
 
 		Sleep(100);
 	}
