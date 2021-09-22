@@ -9,6 +9,7 @@
 #include <string> // c++ string class
 #include <Windows.h>
 #include<deque>
+#include<vector>
 #include"Utils.h"
 using namespace std;
 
@@ -202,7 +203,7 @@ public:
 class Block : public GameObject {
 
 public:
-	Block(int x = 5, int y = 5, const string& shape = "(^_^)")
+	Block(const string& shape = "(^_^)",int x = 5, int y = 5)
 		: GameObject(x, y, shape) {}
 
 	void update() override{
@@ -226,7 +227,10 @@ int main()
 {
 	Screen& screen = *Screen::getInstance();
 	InputManager& inputmanager = *InputManager::getInstance();
-	Block block;
+	//Block block;
+	vector<GameObject*> gameObjects;
+	gameObjects.push_back(new Block{ "(^_^)", 5, 5 });
+	gameObjects.push_back(new Block{ "(-_-)", 10, 10 });
 
 	bool requestExit = false;
 	int x = 0, y = 0;
@@ -236,8 +240,10 @@ int main()
 	
 		inputmanager.readInputs();
 
-		block.update();
-		block.draw();
+		for (auto object : gameObjects) object->update();
+		for (auto object : gameObjects) object->draw();
+		//block.update();
+		//block.draw();
 
 		screen.render();
 
