@@ -7,7 +7,33 @@ struct Position {
 	int x;
 	int y;
 	Position(int x = 0, int y = 0) : x(x), y(y) {}
+
+	const Position operator+(const Position& other) {
+		return Position{ this->x + other.x, this->y + other.y };
+	}
+	const Position operator-(const Position& other) {
+		return Position{ this->x - other.x, this->y - other.y };
+	}
+	Position& operator+=(const Position& source) {
+		this->x += source.x;
+		this->y += source.y;
+		return *this;
+	}
+	Position& operator-=(const Position& source) {
+		this->x -= source.x;
+		this->y -= source.y;
+		return *this;
+	}
+
+	static Position up;
+	static Position down;
+	static Position left;
+	static Position right;
 };
+Position Position::down{ 0,-1 };
+Position Position::up{ 0,1 };
+Position Position::left{ -1,0 };
+Position Position::right{ 1,0 };
 
 class Borland {
 

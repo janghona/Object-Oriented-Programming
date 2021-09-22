@@ -209,16 +209,16 @@ public:
 	void update() override{
 		Position pos = getPos();
 		if (inputManager.GetKeyDown(VK_LEFT) == true) {
-			setPos(pos.x - 1, pos.y);
+			setPos(pos + Position::left);
 		}
 		if (inputManager.GetKeyDown(VK_RIGHT) == true) {
-			setPos(pos.x + 1, pos.y);
+			setPos(pos + Position::right);
 		}
 		if (inputManager.GetKeyDown(VK_UP) == true) {
-			setPos(pos.x, pos.y - 1);
+			setPos(pos + Position::up);
 		}
 		if (inputManager.GetKeyDown(VK_DOWN) == true) {
-			setPos(pos.x, pos.y + 1);
+			setPos(pos + Position::down);
 		}
 	}
 };
