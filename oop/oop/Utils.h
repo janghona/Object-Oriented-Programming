@@ -24,14 +24,22 @@ struct Position {
 		this->y -= source.y;
 		return *this;
 	}
+	const Position operator*(int scale) {
+		return Position{ this->x*scale, this->y*scale };
+	}
+
+	const Position operator/(int scale) {
+		if (scale == 0) return *this;
+		return Position{ (int)(this->x / scale), (int)(this->y / scale) };
+	}
 
 	static Position up;
 	static Position down;
 	static Position left;
 	static Position right;
 };
-Position Position::down{ 0,-1 };
-Position Position::up{ 0,1 };
+Position Position::down{ 0,1 };
+Position Position::up{ 0,-1 };
 Position Position::left{ -1,0 };
 Position Position::right{ 1,0 };
 

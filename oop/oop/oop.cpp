@@ -182,14 +182,24 @@ private:
 protected:
 	Screen& screen;
 	InputManager& inputManager;
+
+	vector<GameObject*> children;
 public:
 	GameObject(int x,int y,const string& shape)
 		:shape(shape),pos(x,y),screen(*Screen::getInstance()),inputManager(*InputManager::getInstance())
 	{
-
+	}
+	GameObject(const Position& pos, const string& shape) 
+		: GameObject(pos.x, pos.y, shape) 
+	{
 	}
 	virtual ~GameObject()
 	{
+	}
+
+	void add(GameObject* child) {
+		if (!child) return;
+		children.push_back(child);
 	}
 
 	void setPos(int x, int y) { pos.x = x; pos.y = y; }
@@ -197,16 +207,44 @@ public:
 	Position getPos() const { return pos; }
 
 	virtual void update() {}
-	virtual void draw() { screen.draw(pos.x, pos.y, shape.c_str()); }
+	virtual void draw(const Position& parentPos) { 
+		Position pos = getPos();
+		pos += parentPos;
+		screen.draw(pos.x, pos.y, shape.c_str()); 
+	}
 };
 
 class Block : public GameObject {
 
 public:
-	Block(const string& shape = "(^_^)",int x = 5, int y = 5)
+	Block(int x = 5, int y = 5, const string& shape = "(^_^)")
 		: GameObject(x, y, shape) {}
 
 	void update() override{
+		Position pos = getPos();
+		if (inputManager.GetKeyDown(VK_MULTIPLY) == true) {
+			setPos(pos *2 );
+		}
+		if (inputManager.GetKeyDown(VK_DIVIDE) == true) {
+			setPos(pos/2);
+		}
+	}
+};
+
+class Panel : public GameObject {
+private:
+	int width;
+	int height;
+	
+	char displayBuffer[100];
+public:
+	Panel(const Position pos, int width, int height)
+		: GameObject(pos, ""), width(width), height(height)
+	{
+
+	}
+
+	void update() override {
 		Position pos = getPos();
 		if (inputManager.GetKeyDown(VK_LEFT) == true) {
 			setPos(pos + Position::left);
@@ -220,6 +258,31 @@ public:
 		if (inputManager.GetKeyDown(VK_DOWN) == true) {
 			setPos(pos + Position::down);
 		}
+		for (auto child : children)
+			child->update();
+	}
+
+	void draw(const Position& parentPos) override {
+		Position pos = getPos();
+		pos += parentPos;
+		int x = pos.x;
+		int y = pos.y;
+
+		if (x <= 0 || x >= screen.getWidth() - 2) return;
+		if (y <= 0 || y >= screen.getHeight() - 2) return;
+
+		int i = x - 1;
+		for (; i < (x + width); i++)
+			displayBuffer[i - x + 1] = '-';
+		displayBuffer[width] = 0;
+		screen.draw(x - 1, y - 1, displayBuffer);
+		screen.draw(x - 1, y - 1 + height, displayBuffer);
+		for (int j = y; j < y - 1 + height; j++) {
+			screen.draw(x - 1, j, '-');
+			screen.draw(x + width - 1, j, '-');
+		}
+		for (auto child : children)
+			child->draw(pos);
 	}
 };
 
@@ -227,24 +290,23 @@ int main()
 {
 	Screen& screen = *Screen::getInstance();
 	InputManager& inputmanager = *InputManager::getInstance();
-	//Block block;
-	vector<GameObject*> gameObjects;
-	gameObjects.push_back(new Block{ "(^_^)", 5, 5 });
-	gameObjects.push_back(new Block{ "(-_-)", 10, 10 });
+
+	vector<GameObject*> scene;
+
+	Panel* panel = new Panel(Position{ 3,3 }, 10, 10);
+	panel->add(new Block{ 0,0 });
+
+	scene.push_back(panel);
 
 	bool requestExit = false;
-	int x = 0, y = 0;
-	
 	while (requestExit == false) {
 		screen.clear();
 	
 		inputmanager.readInputs();
 
-		for (auto object : gameObjects) object->update();
-		for (auto object : gameObjects) object->draw();
-		//block.update();
-		//block.draw();
-
+		for (auto object : scene) object->update();
+		for (auto object : scene) object->draw(Position{0,0});
+	
 		screen.render();
 
 		inputmanager.consumeEvent();
