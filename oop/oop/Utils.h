@@ -8,10 +8,10 @@ struct Position {
 	int y;
 	Position(int x = 0, int y = 0) : x(x), y(y) {}
 
-	const Position operator+(const Position& other) {
+	const Position operator+(const Position& other) const{
 		return Position{ this->x + other.x, this->y + other.y };
 	}
-	const Position operator-(const Position& other) {
+	const Position operator-(const Position& other) const {
 		return Position{ this->x - other.x, this->y - other.y };
 	}
 	Position& operator+=(const Position& source) {
@@ -24,11 +24,11 @@ struct Position {
 		this->y -= source.y;
 		return *this;
 	}
-	const Position operator*(int scale) {
+	const Position operator*(int scale) const{
 		return Position{ this->x*scale, this->y*scale };
 	}
 
-	const Position operator/(int scale) {
+	const Position operator/(int scale) const{
 		if (scale == 0) return *this;
 		return Position{ (int)(this->x / scale), (int)(this->y / scale) };
 	}
