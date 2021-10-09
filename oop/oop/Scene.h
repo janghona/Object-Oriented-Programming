@@ -12,10 +12,9 @@ public:
 	static Scene& getInstance();
 
 	void add(GameObject* go);
-
 	void remove(GameObject* go);
 
+	void start();
 	void update();
-
 	void draw();
 };
